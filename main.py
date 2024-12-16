@@ -7,6 +7,7 @@ import subprocess
 from tts_utils import synthesize_speech
 from ffmpeg_utils import create_video, combine_audio_video
 from story_parser import read_stories
+from subtitle_utils import auto_caption
 
 def main():
     # Configure logging
@@ -81,6 +82,16 @@ def main():
             continue  # Skip to the next story
         except Exception as e:
             logging.error("Failed to combine audio and video for story %d: %s", i, e)
+            continue  # Skip to the next story
+        
+        try:
+            auto_caption(output_video)
+            logging.info("Video with caption saved: %s", output_video)
+        except subprocess.CalledProcessError as e:
+            logging.error("Failed to caption %d: %s", i, e)
+            continue  # Skip to the next story
+        except Exception as e:
+            logging.error("Failed to caption video for story %d: %s", i, e)
             continue  # Skip to the next story
 
         # Remove the temporary video file
