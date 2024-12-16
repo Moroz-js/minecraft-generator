@@ -40,9 +40,8 @@ def main():
     for i, story in enumerate(stories, start=1):
         audio_file = os.path.join(AUDIO_DIR, f"story_{i}.mp3")
         temp_video = os.path.join(OUTPUT_DIR, f"temp_story_{i}.mp4")
-        output_video = os.path.join(OUTPUT_DIR, f"story_{i}.mp4")
+        output_video = os.path.join(OUTPUT_DIR, f"story_1.mp4")
 
-        # Synthesize speech and get its duration
         logging.info("Synthesizing speech for story %d...", i)
         try:
             speech_duration = synthesize_speech(story, audio_file, 'en-US-ChristopherNeural')

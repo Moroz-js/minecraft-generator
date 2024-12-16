@@ -1,109 +1,195 @@
-import moviepy.editor as mp
-import speech_recognition as sr
 import os
-from moviepy.video.tools.subtitles import SubtitlesClip
-from moviepy.editor import TextClip
+from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip
+from pydub import AudioSegment
+import speech_recognition as sr
+from moviepy.config import change_settings
+import requests
+import time
+import assemblyai as aai
 
+change_settings({"IMAGEMAGICK_BINARY": "C:\Program Files (x86)\ImageMagick-7.1.1-Q16\magick.exe"})
+
+# Function to extract audio from video
+def extract_audio_from_video(input_video: str, output_audio: str):
+    try:
+        print(f"Extracting audio from video: {input_video} -> {output_audio}")
+        video_clip = VideoFileClip(input_video)
+        video_clip.audio.write_audiofile(output_audio, codec="libmp3lame")
+        print("Audio extraction completed.")
+    except Exception as e:
+        print(f"Error during audio extraction: {e}")
+        raise
+
+# Function to convert audio to PCM WAV format
+def convert_audio_to_wav(input_audio: str, output_audio: str):
+    try:
+        print(f"Converting audio to WAV: {input_audio} -> {output_audio}")
+        audio = AudioSegment.from_file(input_audio)
+        audio = audio.set_channels(1)  # Ensure mono audio
+        audio = audio.set_frame_rate(16000)  # Standard sample rate for transcription
+        audio.export(output_audio, format="wav")
+        print("Audio conversion completed.")
+    except Exception as e:
+        print(f"Error during audio conversion: {e}")
+        raise
+
+# Function to transcribe audio using SpeechRecognition
+def transcribe_audio_with_word_timestamps(audio_file: str):
+    """
+    Transcribe audio with word-level timestamps using AssemblyAI.
+    Args:
+        audio_file (str): Path to the local audio file or a publicly accessible URL.
+    Returns:
+        List[aai.Word]: List of word objects with timestamps from AssemblyAI.
+    """
+    try:
+        # Set your AssemblyAI API key
+        aai.settings.api_key = ""
+
+        # Create a transcription configuration
+        config = aai.TranscriptionConfig(
+            punctuate=True,
+            format_text=True
+        )
+
+        # Initialize the transcriber with the configuration
+        transcriber = aai.Transcriber(config=config)
+
+        # Start transcription
+        print(f"Starting transcription for: {audio_file}")
+        transcript = transcriber.transcribe(audio_file)
+
+        # Check the status of the transcription
+        if transcript.status == aai.TranscriptStatus.error:
+            print(f"Transcription failed: {transcript.error}")
+            raise Exception(f"Transcription error: {transcript.error}")
+
+        print("Transcription completed.")
+        return transcript.words  # Return the word objects with timestamps
+
+    except Exception as e:
+        print(f"Error during transcription: {e}")
+        raise
+
+# Function to generate quick captions
+def generate_dynamic_captions_from_words(words, words_per_caption=3, gap_threshold=1.0, long_word_length=7):
+    """
+    Generate dynamic captions based on word-level timestamps, adjusting for pauses and long words.
+    Args:
+        words (List[aai.Word]): List of Word objects from AssemblyAI.
+        words_per_caption (int): Maximum number of words per caption.
+        gap_threshold (float): Time gap in seconds to consider a new caption.
+        long_word_length (int): Minimum length of a word to consider it "long".
+    Returns:
+        List[Tuple[float, float, str]]: Captions as (start_time, end_time, text).
+    """
+    captions = []
+    buffer = []
+    start_time = None
+
+    for i, word in enumerate(words):
+        # Start timing for the first word in the buffer
+        if not start_time:
+            start_time = word.start / 1000.0  # Convert milliseconds to seconds
+
+        buffer.append(word.text)
+
+        # Identify if the word is long
+        is_long_word = len(word.text) >= long_word_length
+
+        # Check if the current word should end the caption
+        is_last_word = (i == len(words) - 1)
+        next_word_gap = (words[i + 1].start / 1000.0 - word.end / 1000.0) if not is_last_word else 0
+
+        # Dynamic captioning conditions
+        if (
+            len(buffer) == words_per_caption or               # Standard condition: buffer full
+            is_last_word or                                   # Last word in the sequence
+            next_word_gap > gap_threshold or                 # Pause detected
+            (is_long_word and len(buffer) >= 1)              # Special case: long word triggers a single-word caption
+        ):
+            # End caption here
+            end_time = word.end / 1000.0  # Convert milliseconds to seconds
+            caption_text = " ".join(buffer)
+            captions.append((start_time, end_time, caption_text))
+            buffer = []  # Reset buffer
+            start_time = None  # Reset start time for the next caption
+
+    print(f"Generated {len(captions)} captions.")
+    return captions
+
+# Function to overlay captions onto video
+def add_quick_captions_to_video(video_path: str, captions, output_video_path: str, fade_duration=0.05):
+    """
+    Overlay captions onto the video with custom font styles and padding.
+    Args:
+        video_path (str): Path to the input video.
+        captions (list): List of (start_time, end_time, text) tuples.
+        output_video_path (str): Path to save the output video.
+    """
+    try:
+        print(f"Adding captions to video: {video_path} -> {output_video_path}")
+        video = VideoFileClip(video_path)
+        subtitle_clips = []
+        print(f"Font file exists: {os.path.exists('./Montserrat-Bold.ttf')}")
+
+        for start_time, end_time, text in captions:
+            # Create a TextClip for each caption with custom styles
+            subtitle = (TextClip(text, fontsize=75,  # Font size in 'vmin' relative to video height
+                                 color='#ffffff',  # Fill color
+                                 font='./Montserrat-Bold.otf',  # Font family
+                                 stroke_color='#000000',  # Stroke color
+                                 stroke_width=3))  # Stroke width in 'vmin'
+
+            # Position at the bottom with padding
+            subtitle = (subtitle
+                        .set_position(('center', video.size[1] - subtitle.size[1] - video.size[1] * 0.25))  # Bottom padding
+                        .set_duration(end_time - start_time)
+                        .set_start(start_time))
+            subtitle = subtitle.crossfadein(fade_duration).crossfadeout(fade_duration)
+            subtitle_clips.append(subtitle)
+
+        # Combine the video with the subtitle clips
+        video_with_subtitles = CompositeVideoClip([video, *subtitle_clips])
+
+        # Write the final video with subtitles
+        video_with_subtitles.write_videofile(output_video_path, codec="libx264", audio_codec="aac")
+        print("Video captioning completed.")
+    except Exception as e:
+        print(f"Error during video captioning: {e}")
+        raise
+
+# Main function to process video and add captions
 def auto_caption(input_video: str):
-    print("Starting captioning process...")
-    
-    # Load the video
-    video = mp.VideoFileClip(input_video)
-    print(f"Video loaded: {input_video}")
-    
-    # Extract audio from the video
-    audio = video.audio
-    audio_file = "temp_audio.wav"
-    audio.write_audiofile(audio_file)
-    print(f"Audio extracted and saved as {audio_file}")
-    
-    # Use SpeechRecognition to transcribe the audio to text
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(audio_file) as source:
-        audio_data = recognizer.record(source)
-    
-    # Perform speech-to-text transcription
     try:
-        transcript = recognizer.recognize_google(audio_data)
-        print(f"Transcription completed: {transcript[:100]}...")  # Print first 100 chars for brevity
-    except sr.UnknownValueError:
-        print("Audio is unintelligible, skipping subtitle generation.")
-        return video
-    except sr.RequestError:
-        print("Speech Recognition service is unavailable, skipping subtitle generation.")
-        return video
-    
-    # Split the transcript into chunks of 1-3 words for "quick" captions
-    words = transcript.split()
-    chunk_size = 3  # Each subtitle will contain up to 3 words
-    subtitles = []
-    
-    print(f"Total words in transcript: {len(words)}")
-    
-    # Split words into chunks and assign each chunk a small time interval
-    chunk_duration = video.duration / len(words)  # Approximate time for each word
-    start_time = 0
+        print(f"Processing video: {input_video}")
+        video_name = os.path.splitext(os.path.basename(input_video))[0]
+        audio_path = f"./output/audio/{video_name}.mp3"
+        wav_path = f"./output/audio/{video_name}.wav"
+        output_video_path = f"./output/{video_name}_captioned.mp4"
 
-    # Group words into chunks and compute start and end times
-    for i in range(0, len(words), chunk_size):
-        # Avoid exceeding the list length by using min(chunk_size, len(words) - i)
-        end_time = start_time + chunk_duration * min(chunk_size, len(words) - i)  
-        subtitle_text = ' '.join(words[i:i + chunk_size])
-        
-        # Append (start_time, subtitle_text) to subtitles list
-        subtitles.append((start_time, subtitle_text))
-        print(f"Added subtitle: ({start_time}, {subtitle_text})")
-        
-        start_time = end_time  # Update start time for next chunk
-    
-    # Debugging: Print out the subtitles to check their format
-    print("Subtitles list:")
-    for subtitle in subtitles:
-        print(subtitle)  # Should print a tuple of (start_time, subtitle_text)
-    
-    # Create a function to make text clips for each subtitle
-    def make_textclip(txt):
-        print(f"Creating text clip for subtitle: {txt}")
-        return TextClip(
-            txt,
-            fontsize=48,  # Set font size to 48
-            color='white',  # Set text color to white
-            font='Montserrat-Bold',  # Set font to Montserrat Bold
-            align='center',  # Center-align the text
-            stroke_width=3,  # Set the border width
-            stroke_color='black',  # Set border color to black
-            method='caption'  # Use caption method for better text wrapping
-        ).set_duration(chunk_duration * chunk_size).set_pos('center')  # Position in the center and set duration
-    
-    # Create the subtitle clip
-    try:
-        subtitle_clip = SubtitlesClip(subtitles, make_textclip)
-        print("Subtitle clip created successfully.")
-    except Exception as e:
-        print(f"Error creating subtitle clip: {e}")
-        return video
-    
-    # Overlay subtitles onto the video
-    try:
-        video_with_subtitles = mp.CompositeVideoClip([video, subtitle_clip.set_pos('bottom')])
-        print("Video with subtitles created successfully.")
-    except Exception as e:
-        print(f"Error overlaying subtitles: {e}")
-        return video
-    
-    # Output file path
-    output_file = os.path.splitext(input_video)[0] + "_with_subtitles.mp4"
-    
-    # Write the result to a file
-    try:
-        video_with_subtitles.write_videofile(output_file, codec="libx264", fps=video.fps)
-        print(f"Video with subtitles saved to {output_file}")
-    except Exception as e:
-        print(f"Error writing video to file: {e}")
-        return video
-    
-    # Clean up temporary audio file
-    os.remove(audio_file)
-    
-    return output_file
+        # Ensure directories exist
+        os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+        os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
 
+        # Step 1: Extract audio from video
+        extract_audio_from_video(input_video, audio_path)
+
+        # Step 2: Convert MP3 to WAV
+        convert_audio_to_wav(audio_path, wav_path)
+
+        # Step 3: Transcribe audio to get word-level timestamps
+        words = transcribe_audio_with_word_timestamps(wav_path)
+
+        # Step 4: Generate captions from word timestamps
+        captions = generate_dynamic_captions_from_words(words)
+        print(f"First few captions: {captions[:5]}")  # Debugging output
+
+        # Step 5: Add captions to video
+        add_quick_captions_to_video(input_video, captions, output_video_path)
+
+        print(f"Captioned video saved at: {output_video_path}")
+        return output_video_path
+    except Exception as e:
+        print(f"Error during auto-captioning: {e}")
+        raise
