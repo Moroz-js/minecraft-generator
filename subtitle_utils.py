@@ -6,6 +6,8 @@ from moviepy.config import change_settings
 import requests
 import time
 import assemblyai as aai
+from dotenv import load_dotenv
+load_dotenv()
 
 change_settings({"IMAGEMAGICK_BINARY": "C:\Program Files (x86)\ImageMagick-7.1.1-Q16\magick.exe"})
 
@@ -44,7 +46,7 @@ def transcribe_audio_with_word_timestamps(audio_file: str):
     """
     try:
         # Set your AssemblyAI API key
-        aai.settings.api_key = ""
+        aai.settings.api_key = os.getenv('AAI_API_KEY')
 
         # Create a transcription configuration
         config = aai.TranscriptionConfig(
@@ -158,7 +160,7 @@ def add_quick_captions_to_video_with_music(video_path: str, captions, output_vid
         background_music = AudioFileClip(background_music_path)
 
         # Adjust the volume of the background music
-        background_music = background_music.volumex(0.02)  # Set music volume
+        background_music = background_music.volumex(0.00)  # Set music volume
 
         # Handle music longer or shorter than video duration
         duration = video.duration
