@@ -29,21 +29,21 @@ async def synthesize_speech_async(text: str, output_file: str, voice: Optional[s
         
         # Load the audio file to determine its duration
         audio = AudioSegment.from_file(output_file)
-        new_sample_rate = int(audio.frame_rate * 1)
-        sped_up_audio = audio._spawn(audio.raw_data, overrides={'frame_rate': new_sample_rate}).set_frame_rate(audio.frame_rate)
+        # new_sample_rate = int(audio.frame_rate * 1)
+        # sped_up_audio = audio._spawn(audio.raw_data, overrides={'frame_rate': new_sample_rate}).set_frame_rate(audio.frame_rate)
         
-        # Export the sped-up audio to the same output file or a different one
-        sped_up_audio.export(output_file, format="mp3")
+        # # Export the sped-up audio to the same output file or a different one
+        # sped_up_audio.export(output_file, format="mp3")
         
         # Return the duration of the sped-up audio
-        duration = sped_up_audio.duration_seconds
+        duration = audio.duration_seconds
         
         return duration
     except Exception as e:
         print(f"An error occurred during synthesis: {e}")
         return 0.0
 
-def synthesize_speech(text: str, output_file: str, voice: Optional[str] = "en-US-AndrewMultilingualNeural") -> float:
+def synthesize_speech(text: str, output_file: str, voice: Optional[str] = "en-US-ChristopherNeural") -> float:
     """
     Synthesize speech from text and save it as an MP3 file using edge-tts.
 
