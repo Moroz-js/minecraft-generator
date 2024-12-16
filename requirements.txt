@@ -1,0 +1,10 @@
+moviepy==1.0.3
+Pillow==9.5.0
+gTTS
+imageio
+imageio_ffmpeg
+numpy
+proglog
+python-dotenv
+tqdm
+colorama
