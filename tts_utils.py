@@ -5,8 +5,8 @@ from typing import Optional
 
 import edge_tts
 from pydub import AudioSegment
+from constants import AUDIO_DIR
 
-AUDIO_DIR = "audio"  # Define your audio directory path here
 
 async def synthesize_speech_async(text: str, output_file: str, voice: Optional[str] = "en-US-AndrewMultilingualNeural") -> float:
     """
