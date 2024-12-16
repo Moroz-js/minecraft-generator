@@ -42,46 +42,46 @@ def main():
         temp_video = os.path.join(OUTPUT_DIR, f"temp_story_{i}.mp4")
         output_video = os.path.join(OUTPUT_DIR, f"story_1.mp4")
 
-        logging.info("Synthesizing speech for story %d...", i)
-        try:
-            speech_duration = synthesize_speech(story, audio_file, 'en-US-ChristopherNeural')
-            logging.info("Speech duration for story %d: %.2f seconds", i, speech_duration)
-        except Exception as e:
-            logging.error("Failed to synthesize speech for story %d: %s", i, e)
-            continue  # Skip to the next story
+        # logging.info("Synthesizing speech for story %d...", i)
+        # try:
+        #     speech_duration = synthesize_speech(story, audio_file, 'en-US-ChristopherNeural')
+        #     logging.info("Speech duration for story %d: %.2f seconds", i, speech_duration)
+        # except Exception as e:
+        #     logging.error("Failed to synthesize speech for story %d: %s", i, e)
+        #     continue  # Skip to the next story
 
-        # Create a video that matches the duration of the speech
-        logging.info("Generating base video for story %d...", i)
-        try:
-            create_video(
-                input_video=INPUT_VIDEO,
-                output_video=temp_video,
-                desired_duration=speech_duration,
-                fps=30,               # Set desired fps
-                target_width=1080,    # 9:16 width
-                target_height=1920,   # 9:16 height
-                crf=25,               # Quality setting
-                preset="slow"         # Encoding preset
-            )
-            logging.info("Base video created at: %s", temp_video)
-        except subprocess.CalledProcessError as e:
-            logging.error("FFmpeg failed to create video for story %d: %s", i, e)
-            continue  # Skip to the next story
-        except Exception as e:
-            logging.error("Failed to create video for story %d: %s", i, e)
-            continue  # Skip to the next story
+        # # Create a video that matches the duration of the speech
+        # logging.info("Generating base video for story %d...", i)
+        # try:
+        #     create_video(
+        #         input_video=INPUT_VIDEO,
+        #         output_video=temp_video,
+        #         desired_duration=speech_duration,
+        #         fps=30,               # Set desired fps
+        #         target_width=1080,    # 9:16 width
+        #         target_height=1920,   # 9:16 height
+        #         crf=25,               # Quality setting
+        #         preset="slow"         # Encoding preset
+        #     )
+        #     logging.info("Base video created at: %s", temp_video)
+        # except subprocess.CalledProcessError as e:
+        #     logging.error("FFmpeg failed to create video for story %d: %s", i, e)
+        #     continue  # Skip to the next story
+        # except Exception as e:
+        #     logging.error("Failed to create video for story %d: %s", i, e)
+        #     continue  # Skip to the next story
 
         # Combine the synthesized speech with the generated video
-        logging.info("Combining audio and video for story %d...", i)
-        try:
-            combine_audio_video(audio_file, temp_video, output_video)
-            logging.info("Combined video saved at: %s", output_video)
-        except subprocess.CalledProcessError as e:
-            logging.error("FFmpeg failed to combine audio and video for story %d: %s", i, e)
-            continue  # Skip to the next story
-        except Exception as e:
-            logging.error("Failed to combine audio and video for story %d: %s", i, e)
-            continue  # Skip to the next story
+        # logging.info("Combining audio and video for story %d...", i)
+        # try:
+        #     combine_audio_video(audio_file, temp_video, output_video)
+        #     logging.info("Combined video saved at: %s", output_video)
+        # except subprocess.CalledProcessError as e:
+        #     logging.error("FFmpeg failed to combine audio and video for story %d: %s", i, e)
+        #     continue  # Skip to the next story
+        # except Exception as e:
+        #     logging.error("Failed to combine audio and video for story %d: %s", i, e)
+        #     continue  # Skip to the next story
         
         try:
             auto_caption(output_video)

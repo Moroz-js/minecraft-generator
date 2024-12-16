@@ -1,5 +1,5 @@
 import os
-from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip
+from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip, CompositeAudioClip
 from pydub import AudioSegment
 import speech_recognition as sr
 from moviepy.config import change_settings
@@ -119,22 +119,23 @@ def generate_dynamic_captions_from_words(words, words_per_caption=3, gap_thresho
     return captions
 
 # Function to overlay captions onto video
-def add_quick_captions_to_video(video_path: str, captions, output_video_path: str, fade_duration=0.05):
+def add_quick_captions_to_video_with_music(video_path: str, captions, output_video_path: str, background_music_path: str, fade_duration=0.1):
     """
-    Overlay captions onto the video with custom font styles and padding.
+    Overlay captions onto the video and add looping background music.
     Args:
         video_path (str): Path to the input video.
         captions (list): List of (start_time, end_time, text) tuples.
         output_video_path (str): Path to save the output video.
+        background_music_path (str): Path to the background music file (MP3).
+        fade_duration (float): Duration of the fade effect in seconds.
     """
     try:
-        print(f"Adding captions to video: {video_path} -> {output_video_path}")
+        print(f"Processing video: {video_path} with captions and music")
         video = VideoFileClip(video_path)
         subtitle_clips = []
-        print(f"Font file exists: {os.path.exists('./Montserrat-Bold.ttf')}")
 
+        # Add captions to the video
         for start_time, end_time, text in captions:
-            # Create a TextClip for each caption with custom styles
             subtitle = (TextClip(text, fontsize=75,  # Font size in 'vmin' relative to video height
                                  color='#ffffff',  # Fill color
                                  font='./Montserrat-Bold.otf',  # Font family
@@ -146,17 +147,38 @@ def add_quick_captions_to_video(video_path: str, captions, output_video_path: st
                         .set_position(('center', video.size[1] - subtitle.size[1] - video.size[1] * 0.25))  # Bottom padding
                         .set_duration(end_time - start_time)
                         .set_start(start_time))
-            subtitle = subtitle.crossfadein(fade_duration).crossfadeout(fade_duration)
+            subtitle = subtitle.crossfadein(fade_duration).crossfadeout(fade_duration)  # Add fade effect
             subtitle_clips.append(subtitle)
 
-        # Combine the video with the subtitle clips
+        # Combine the video and subtitle clips
         video_with_subtitles = CompositeVideoClip([video, *subtitle_clips])
 
-        # Write the final video with subtitles
+        # Add background music
+        print(f"Adding background music from: {background_music_path}")
+        background_music = AudioFileClip(background_music_path)
+
+        # Adjust the volume of the background music
+        background_music = background_music.volumex(0.02)  # Set music volume
+
+        # Handle music longer or shorter than video duration
+        duration = video.duration
+        if background_music.duration < duration:
+            # Loop music to match video duration
+            looped_music = background_music.fx(AudioFileClip.loop, duration=duration)
+        else:
+            # Trim music to match video duration
+            looped_music = background_music.subclip(0, duration)
+
+        # Combine the video's original audio with the background music
+        final_audio = CompositeAudioClip([video_with_subtitles.audio, looped_music])
+        video_with_subtitles = video_with_subtitles.set_audio(final_audio)
+
+        # Export the final video
         video_with_subtitles.write_videofile(output_video_path, codec="libx264", audio_codec="aac")
-        print("Video captioning completed.")
+        print(f"Video saved at: {output_video_path}")
+
     except Exception as e:
-        print(f"Error during video captioning: {e}")
+        print(f"Error processing video with captions and music: {e}")
         raise
 
 # Main function to process video and add captions
@@ -186,7 +208,7 @@ def auto_caption(input_video: str):
         print(f"First few captions: {captions[:5]}")  # Debugging output
 
         # Step 5: Add captions to video
-        add_quick_captions_to_video(input_video, captions, output_video_path)
+        add_quick_captions_to_video_with_music(input_video, captions, output_video_path,  background_music_path="./background.mp3",)
 
         print(f"Captioned video saved at: {output_video_path}")
         return output_video_path
