@@ -1,6 +1,6 @@
 # subtitle_utils.py
 
-from moviepy.editor import (
+from moviepy.editor import ( # type: ignore
     VideoFileClip,
     TextClip,
     CompositeVideoClip,

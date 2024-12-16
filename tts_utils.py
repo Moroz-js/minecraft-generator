@@ -3,8 +3,8 @@ import os
 import asyncio
 from typing import Optional
 
-import edge_tts
-from pydub import AudioSegment
+import edge_tts # type: ignore
+from pydub import AudioSegment # type: ignore
 from constants import AUDIO_DIR
 
 
