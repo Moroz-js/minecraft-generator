@@ -29,7 +29,7 @@ async def synthesize_speech_async(text: str, output_file: str, voice: Optional[s
         
         # Load the audio file to determine its duration
         audio = AudioSegment.from_file(output_file)
-        new_sample_rate = int(audio.frame_rate * 1.1)
+        new_sample_rate = int(audio.frame_rate * 1.07)
         sped_up_audio = audio._spawn(audio.raw_data, overrides={'frame_rate': new_sample_rate}).set_frame_rate(audio.frame_rate)
         
         # Export the sped-up audio to the same output file or a different one

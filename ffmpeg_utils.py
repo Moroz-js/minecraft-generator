@@ -100,7 +100,7 @@ def create_video(input_video: str, output_video: str, desired_duration: float, f
 
     # Choose a random start time
     max_start = total_duration - desired_duration
-    start_sec = random.uniform(0, max_start)
+    start_sec = 1
     end_sec = start_sec + desired_duration
 
     logging.info(f"Selected random start time: {start_sec:.2f}s (End: {end_sec:.2f}s)")
